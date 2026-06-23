@@ -13,6 +13,7 @@ const productSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
+      index: true,
     },
   },
   {
@@ -20,12 +21,11 @@ const productSchema = new mongoose.Schema(
   },
 );
 
-// Important for pagination
-productSchema.index({
-  category: 1,
-  updatedAt: -1,
-  _id: -1,
-});
+// Supports category-filtered pagination (newest first)
+productSchema.index({ category: 1, updatedAt: -1, _id: -1 });
+
+// Supports unfiltered pagination (newest first)
+productSchema.index({ updatedAt: -1, _id: -1 });
 
 const ProductModel = mongoose.model("Product", productSchema);
 
