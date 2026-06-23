@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Products</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 1.5rem;
+        background: #f5f5f5;
+        color: #222;
+      }
+      h1 {
+        margin: 0 0 1rem;
+        font-size: 1.25rem;
+      }
+      .controls {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+      select,
+      button {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.9rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      th,
+      td {
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+      }
+      th {
+        background: #fafafa;
+        font-size: 0.8rem;
+      }
+      td {
+        font-size: 0.85rem;
+      }
+      .pagination {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+      .status {
+        margin-top: 0.75rem;
+        font-size: 0.85rem;
+        color: #666;
+      }
+      .error {
+        color: #c00;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Products</h1>
+
+    <div class="controls">
+      <select id="category">
+        <option value="">All categories</option>
+        <option value="Electronics">Electronics</option>
+        <option value="Books">Books</option>
+        <option value="Clothing">Clothing</option>
+        <option value="Sports">Sports</option>
+        <option value="Home">Home</option>
+      </select>
+      <button id="apply">Apply</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Category</th>
+          <th>Price</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div class="pagination">
+      <button id="prev" disabled>Previous</button>
+      <button id="next" disabled>Next</button>
+    </div>
+    <div class="status" id="status"></div>
+
+    <script>
+      const categoryEl = document.getElementById("category");
+      const rowsEl = document.getElementById("rows");
+      const statusEl = document.getElementById("status");
+      const prevBtn = document.getElementById("prev");
+      const nextBtn = document.getElementById("next");
+
+      let cursor = null;
+      let nextCursor = null;
+      let cursorStack = [];
+
+      async function loadProducts(direction = "reset") {
+        statusEl.textContent = "Loading...";
+        statusEl.classList.remove("error");
+
+        if (direction === "reset") {
+          cursor = null;
+          cursorStack = [];
+        } else if (direction === "next") {
+          cursorStack.push(cursor);
+          cursor = nextCursor;
+        } else if (direction === "prev") {
+          cursor = cursorStack.pop() ?? null;
+        }
+
+        const params = new URLSearchParams({ limit: "20" });
+        if (categoryEl.value) params.set("category", categoryEl.value);
+        if (cursor) params.set("cursor", cursor);
+
+        try {
+          const res = await fetch("/api/products?" + params);
+          const data = await res.json();
+
+          if (!res.ok) throw new Error(data.error || "Request failed");
+
+          nextCursor = data.nextCursor;
+          rowsEl.innerHTML = data.products
+            .map(
+              (p) =>
+                `<tr>
+                  <td>${p.name}</td>
+                  <td>${p.category}</td>
+                  <td>${p.price}</td>
+                  <td>${new Date(p.updatedAt).toLocaleString()}</td>
+                </tr>`,
+            )
+            .join("");
+
+          prevBtn.disabled = cursorStack.length === 0;
+          nextBtn.disabled = !data.hasMore;
+          statusEl.textContent = `Showing ${data.products.length} products`;
+        } catch (err) {
+          rowsEl.innerHTML = "";
+          statusEl.textContent = err.message;
+          statusEl.classList.add("error");
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+        }
+      }
+
+      document
+        .getElementById("apply")
+        .addEventListener("click", () => loadProducts("reset"));
+      prevBtn.addEventListener("click", () => loadProducts("prev"));
+      nextBtn.addEventListener("click", () => loadProducts("next"));
+
+      loadProducts("reset");
+    </script>
+  </body>
+</html>
